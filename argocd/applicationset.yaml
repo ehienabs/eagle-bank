@@ -1,0 +1,70 @@
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: eagle-bank
+  namespace: argocd
+spec:
+  generators:
+    - list:
+        elements:
+          - environment: dev
+            branch: develop
+            namespace: eagle-bank-dev
+            replicaCount: "1"
+            logLevel: debug
+            traceSampleRate: "1.0"
+            autoSync: "true"
+          - environment: staging
+            branch: main
+            namespace: eagle-bank-staging
+            replicaCount: "2"
+            logLevel: info
+            traceSampleRate: "0.5"
+            autoSync: "true"
+          - environment: production
+            branch: main
+            namespace: eagle-bank-prod
+            replicaCount: "3"
+            logLevel: info
+            traceSampleRate: "0.1"
+            autoSync: "false"
+
+  template:
+    metadata:
+      name: 'eagle-bank-{{environment}}'
+      namespace: argocd
+      labels:
+        app.kubernetes.io/name: eagle-bank
+        app.kubernetes.io/instance: '{{environment}}'
+        environment: '{{environment}}'
+      finalizers:
+        - resources-finalizer.argocd.argoproj.io
+    spec:
+      project: eagle-bank
+      source:
+        repoURL: https://github.com/ehienabs/eagle-bank.git
+        targetRevision: '{{branch}}'
+        path: helm/eagle-bank
+        helm:
+          releaseName: 'eagle-bank-{{environment}}'
+          values: |
+            replicaCount: {{replicaCount}}
+            config:
+              app:
+                environment: {{environment}}
+              logger:
+                level: {{logLevel}}
+              tracing:
+                sampleRate: {{traceSampleRate}}
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: '{{namespace}}'
+      syncPolicy:
+        automated:
+          prune: '{{autoSync}}'
+          selfHeal: '{{autoSync}}'
+        syncOptions:
+          - CreateNamespace=true
+
+  syncPolicy:
+    preserveResourcesOnDeletion: true

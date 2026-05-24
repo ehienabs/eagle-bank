@@ -1,0 +1,85 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eagle-bank-staging
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: eagle-bank
+    app.kubernetes.io/instance: staging
+    app.kubernetes.io/part-of: eagle-bank
+    environment: staging
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: eagle-bank
+
+  source:
+    repoURL: https://github.com/ehienabs/eagle-bank.git
+    targetRevision: main
+    path: helm/eagle-bank
+
+    helm:
+      releaseName: eagle-bank-staging
+      valueFiles:
+        - values.yaml
+      values: |
+        replicaCount: 2
+
+        config:
+          app:
+            environment: staging
+          logger:
+            level: info
+          tracing:
+            sampleRate: 0.5
+
+        autoscaling:
+          enabled: true
+          minReplicas: 2
+          maxReplicas: 5
+
+        resources:
+          limits:
+            cpu: 300m
+            memory: 384Mi
+          requests:
+            cpu: 100m
+            memory: 128Mi
+
+        ingress:
+          enabled: true
+          className: nginx
+          hosts:
+            - host: eagle-bank-staging.example.com
+              paths:
+                - path: /
+                  pathType: Prefix
+          tls:
+            - secretName: eagle-bank-staging-tls
+              hosts:
+                - eagle-bank-staging.example.com
+
+        externalServices:
+          database:
+            host: postgresql-staging
+          kafka:
+            brokers:
+              - kafka-staging:9092
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: eagle-bank-staging
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+    retry:
+      limit: 5
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m

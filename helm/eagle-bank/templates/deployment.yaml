@@ -1,0 +1,221 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "eagle-bank.fullname" . }}
+  labels:
+    {{- include "eagle-bank.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "eagle-bank.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        {{- with .Values.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      labels:
+        {{- include "eagle-bank.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "eagle-bank.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.initContainers }}
+      initContainers:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: {{ include "eagle-bank.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.config.server.port }}
+              protocol: TCP
+          env:
+            # Application configuration
+            - name: APP_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: APP_NAME
+            - name: APP_VERSION
+              value: {{ .Chart.AppVersion | quote }}
+            - name: APP_ENVIRONMENT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: APP_ENVIRONMENT
+            # Server configuration
+            - name: SERVER_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: SERVER_PORT
+            - name: SERVER_READ_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: SERVER_READ_TIMEOUT
+            - name: SERVER_WRITE_TIMEOUT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: SERVER_WRITE_TIMEOUT
+            - name: SERVER_RATE_LIMIT_RPS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: SERVER_RATE_LIMIT_RPS
+            - name: SERVER_RATE_LIMIT_BURST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: SERVER_RATE_LIMIT_BURST
+            # Database configuration
+            - name: DATABASE_HOST
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: DATABASE_HOST
+            - name: DATABASE_PORT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: DATABASE_PORT
+            - name: DATABASE_NAME
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: DATABASE_NAME
+            - name: DATABASE_USER
+              value: "eaglebank"
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "eagle-bank.secretName" . }}
+                  key: DATABASE_PASSWORD
+            - name: DATABASE_SSLMODE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: DATABASE_SSLMODE
+            # Kafka configuration
+            - name: KAFKA_BROKERS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: KAFKA_BROKERS
+            - name: KAFKA_TOPIC_EVENTS
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: KAFKA_TOPIC_EVENTS
+            - name: KAFKA_CONSUMER_GROUP
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: KAFKA_CONSUMER_GROUP
+            # Auth configuration
+            - name: AUTH_JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "eagle-bank.secretName" . }}
+                  key: AUTH_JWT_SECRET
+            - name: AUTH_TOKEN_EXPIRY
+              value: "24h"
+            # Logger configuration
+            - name: LOGGER_LEVEL
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: LOGGER_LEVEL
+            - name: LOGGER_FORMAT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: LOGGER_FORMAT
+            # Metrics configuration
+            - name: METRICS_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: METRICS_ENABLED
+            # Tracing configuration
+            - name: TRACING_ENABLED
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: TRACING_ENABLED
+            - name: TRACING_OTLP_ENDPOINT
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: TRACING_OTLP_ENDPOINT
+            - name: TRACING_SAMPLE_RATE
+              valueFrom:
+                configMapKeyRef:
+                  name: {{ include "eagle-bank.fullname" . }}
+                  key: TRACING_SAMPLE_RATE
+            {{- with .Values.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.livenessProbe }}
+          livenessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.readinessProbe }}
+          readinessProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.startupProbe }}
+          startupProbe:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            {{- with .Values.extraVolumeMounts }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        {{- with .Values.sidecars }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        {{- with .Values.extraVolumes }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
