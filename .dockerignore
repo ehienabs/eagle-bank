@@ -1,0 +1,43 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+dist/
+
+# Test artifacts
+coverage.out
+coverage.html
+*.test
+
+# Documentation
+*.md
+!README.md
+docs/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Helm charts (built separately)
+helm/
+
+# ArgoCD manifests
+argocd/
+
+# Local development
+.env
+.env.local
+*.local
+
+# Temporary files
+tmp/
+*.tmp
+*.log

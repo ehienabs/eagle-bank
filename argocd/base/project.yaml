@@ -1,0 +1,99 @@
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: eagle-bank
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: eagle-bank
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  description: Eagle Bank Banking API Project
+
+  # Source repositories
+  sourceRepos:
+    - https://github.com/ehienabs/eagle-bank.git
+    - https://charts.bitnami.com/bitnami
+
+  # Destination clusters and namespaces
+  destinations:
+    - namespace: eagle-bank
+      server: https://kubernetes.default.svc
+    - namespace: eagle-bank-dev
+      server: https://kubernetes.default.svc
+    - namespace: eagle-bank-staging
+      server: https://kubernetes.default.svc
+    - namespace: eagle-bank-prod
+      server: https://kubernetes.default.svc
+
+  # Cluster resource whitelist
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding
+
+  # Namespace resource blacklist (deny dangerous resources)
+  namespaceResourceBlacklist:
+    - group: ''
+      kind: ResourceQuota
+    - group: ''
+      kind: LimitRange
+
+  # Namespace resource whitelist
+  namespaceResourceWhitelist:
+    - group: ''
+      kind: '*'
+    - group: apps
+      kind: '*'
+    - group: networking.k8s.io
+      kind: '*'
+    - group: policy
+      kind: '*'
+    - group: autoscaling
+      kind: '*'
+    - group: monitoring.coreos.com
+      kind: '*'
+
+  # Roles for access control
+  roles:
+    - name: developer
+      description: Developer access to eagle-bank
+      policies:
+        - p, proj:eagle-bank:developer, applications, get, eagle-bank/*, allow
+        - p, proj:eagle-bank:developer, applications, sync, eagle-bank/*, allow
+        - p, proj:eagle-bank:developer, logs, get, eagle-bank/*, allow
+      groups:
+        - eagle-bank-developers
+
+    - name: admin
+      description: Admin access to eagle-bank
+      policies:
+        - p, proj:eagle-bank:admin, applications, *, eagle-bank/*, allow
+        - p, proj:eagle-bank:admin, logs, *, eagle-bank/*, allow
+        - p, proj:eagle-bank:admin, exec, *, eagle-bank/*, allow
+      groups:
+        - eagle-bank-admins
+
+  # Sync windows for controlled deployments
+  syncWindows:
+    - kind: allow
+      schedule: '0 * * * *'
+      duration: 1h
+      applications:
+        - '*-dev'
+      manualSync: true
+    - kind: allow
+      schedule: '0 10-18 * * 1-5'
+      duration: 8h
+      applications:
+        - '*-staging'
+      manualSync: true
+    - kind: deny
+      schedule: '0 0-6 * * *'
+      duration: 6h
+      applications:
+        - '*-prod'
+      manualSync: false

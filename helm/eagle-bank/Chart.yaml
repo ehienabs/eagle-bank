@@ -1,0 +1,22 @@
+apiVersion: v2
+name: eagle-bank
+description: A Helm chart for Eagle Bank API - Event-driven banking microservice
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - banking
+  - api
+  - microservice
+  - event-driven
+maintainers:
+  - name: Eagle Bank Team
+    email: team@eagle-bank.io
+home: https://github.com/ehienabs/eagle-bank
+sources:
+  - https://github.com/ehienabs/eagle-bank
+annotations:
+  artifacthub.io/license: MIT
+  artifacthub.io/signKey: |
+    fingerprint: ""
+    url: ""

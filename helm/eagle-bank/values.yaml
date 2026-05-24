@@ -1,0 +1,261 @@
+# Default values for eagle-bank
+# This is a YAML-formatted file.
+
+# Global settings
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Application settings
+replicaCount: 2
+
+image:
+  repository: eagle-bank
+  pullPolicy: IfNotPresent
+  tag: ""  # Overrides the chart appVersion
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+# Service account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Pod annotations and labels
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8080"
+  prometheus.io/path: "/metrics"
+
+podLabels: {}
+
+# Pod security context
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Container security context
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+# Service configuration
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+  annotations: {}
+
+# Ingress configuration
+ingress:
+  enabled: false
+  className: "nginx"
+  annotations:
+    kubernetes.io/tls-acme: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+  hosts:
+    - host: eagle-bank.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: eagle-bank-tls
+  #    hosts:
+  #      - eagle-bank.local
+
+# Resource limits and requests
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+# Autoscaling
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+        - type: Percent
+          value: 10
+          periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 0
+      policies:
+        - type: Percent
+          value: 100
+          periodSeconds: 15
+        - type: Pods
+          value: 4
+          periodSeconds: 15
+      selectPolicy: Max
+
+# Pod disruption budget
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+  # maxUnavailable: 1
+
+# Node selector
+nodeSelector: {}
+
+# Tolerations
+tolerations: []
+
+# Affinity
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - eagle-bank
+          topologyKey: kubernetes.io/hostname
+
+# Liveness probe
+livenessProbe:
+  httpGet:
+    path: /live
+    port: http
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Readiness probe
+readinessProbe:
+  httpGet:
+    path: /ready
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Startup probe
+startupProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 5
+  periodSeconds: 5
+  timeoutSeconds: 3
+  failureThreshold: 30
+
+# Application configuration
+config:
+  app:
+    name: eagle-bank
+    environment: production
+  server:
+    port: 8080
+    readTimeout: 30s
+    writeTimeout: 30s
+    idleTimeout: 120s
+    rateLimitRPS: 100
+    rateLimitBurst: 200
+  logger:
+    level: info
+    format: json
+  metrics:
+    enabled: true
+  tracing:
+    enabled: true
+    sampleRate: 0.1
+
+# External services configuration
+externalServices:
+  database:
+    host: postgresql
+    port: 5432
+    database: eaglebank
+    sslMode: require
+    maxOpenConns: 25
+    maxIdleConns: 5
+  kafka:
+    brokers:
+      - kafka:9092
+    topicEvents: eagle-bank-events
+    consumerGroup: eagle-bank-api
+  tracing:
+    otlpEndpoint: jaeger-collector:4317
+
+# Secrets (use external secrets in production)
+secrets:
+  # Set these via --set or use external secrets manager
+  databasePassword: ""
+  jwtSecret: ""
+  # Reference to existing secret
+  existingSecret: ""
+
+# ConfigMap for additional configuration
+extraConfigMap: {}
+
+# Extra environment variables
+extraEnv: []
+
+# Extra volumes
+extraVolumes: []
+
+# Extra volume mounts
+extraVolumeMounts: []
+
+# Init containers
+initContainers: []
+
+# Sidecar containers
+sidecars: []
+
+# ServiceMonitor for Prometheus Operator
+serviceMonitor:
+  enabled: true
+  namespace: ""
+  interval: 15s
+  scrapeTimeout: 10s
+  labels: {}
+  annotations: {}
+  relabelings: []
+  metricRelabelings: []
+
+# Network policies
+networkPolicy:
+  enabled: false
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    - to:
+        - namespaceSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5432  # PostgreSQL
+        - protocol: TCP
+          port: 9092  # Kafka
+
+# Topology spread constraints
+topologySpreadConstraints: []

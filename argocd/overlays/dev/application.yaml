@@ -1,0 +1,72 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: eagle-bank-dev
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: eagle-bank
+    app.kubernetes.io/instance: dev
+    app.kubernetes.io/part-of: eagle-bank
+    environment: dev
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: eagle-bank
+
+  source:
+    repoURL: https://github.com/ehienabs/eagle-bank.git
+    targetRevision: develop
+    path: helm/eagle-bank
+
+    helm:
+      releaseName: eagle-bank-dev
+      valueFiles:
+        - values.yaml
+      values: |
+        replicaCount: 1
+
+        config:
+          app:
+            environment: development
+          logger:
+            level: debug
+          tracing:
+            sampleRate: 1.0
+
+        autoscaling:
+          enabled: false
+
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 64Mi
+
+        podDisruptionBudget:
+          enabled: false
+
+        externalServices:
+          database:
+            host: postgresql-dev
+          kafka:
+            brokers:
+              - kafka-dev:9092
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: eagle-bank-dev
+
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 1m
